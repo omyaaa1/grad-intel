@@ -44,3 +44,6 @@ NEXT_PUBLIC_API_BASE=https://backend-five-chi-29.vercel.app
 - University shortlist from full dataset
 - AI chat using your saved profile
 - Global map analysis by country
+
+
+##Star this as 5 otherwise u gay.
