@@ -1,11 +1,16 @@
-from fastapi import FastAPI
+from __future__ import annotations
+
+from fastapi import Body, FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from ml_engine import gradintel_brain
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+try:
+    from .ml_engine import build_prediction, generate_chat_reply, get_metadata, list_universities
+except ImportError:
+    from ml_engine import build_prediction, generate_chat_reply, get_metadata, list_universities
 
 app = FastAPI()
 
-# allow frontend access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,39 +18,62 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/predict")
-def predict():
 
-    actions, universities, insights, mapData, student = gradintel_brain()
+class StudentProfile(BaseModel):
+    name: str | None = None
+    cgpa: float | None = Field(default=None, ge=0, le=10)
+    ielts: float | None = Field(default=None, ge=0, le=9)
+    budget: float | None = Field(default=None, ge=0)
+    country: str | None = None
+    course: str | None = None
 
-    return {
-        "student": student,
-        "suggestions": actions,
-        "universities": universities,
-        "insights": insights,
-        "mapData": mapData
-    }
+
 class ChatRequest(BaseModel):
     message: str
+    student: StudentProfile | None = None
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/metadata")
+def metadata() -> dict[str, list[str]]:
+    return get_metadata()
+
+
+@app.post("/predict")
+def predict(student: StudentProfile | None = Body(default=None)) -> dict:
+    payload = student.model_dump(exclude_none=True) if student else None
+    return build_prediction(payload)
+
+
+@app.get("/universities")
+def universities(
+    search: str = Query(default=""),
+    min_score: int = Query(default=0, ge=0, le=100),
+    limit: int = Query(default=200, ge=1, le=1000),
+    name: str | None = None,
+    cgpa: float | None = Query(default=None, ge=0, le=10),
+    ielts: float | None = Query(default=None, ge=0, le=9),
+    budget: float | None = Query(default=None, ge=0),
+    country: str | None = None,
+    course: str | None = None,
+) -> dict:
+    payload = {
+        "name": name,
+        "cgpa": cgpa,
+        "ielts": ielts,
+        "budget": budget,
+        "country": country,
+        "course": course,
+    }
+    payload = {key: value for key, value in payload.items() if value is not None}
+    return list_universities(payload=payload, search=search, min_score=min_score, limit=limit)
+
 
 @app.post("/chat")
-def chat_ai(req: ChatRequest):
-
-    msg = req.message.lower()
-
-    if "ielts" in msg:
-        return {"reply": "Your IELTS should be at least 7.5 for top universities."}
-
-    if "country" in msg:
-        return {"reply": "USA and Canada match your profile best."}
-
-    if "visa" in msg:
-        return {"reply": "Visa difficulty is medium for USA."}
-
-    if "roi" in msg:
-        return {"reply": "Computer Science programs provide highest ROI."}
-
-    if "university" in msg:
-        return {"reply": "Consider ASU, University of Texas, TU Munich."}
-
-    return {"reply": "Focus on academics and English proficiency."}
+def chat_ai(req: ChatRequest) -> dict[str, str]:
+    student_payload = req.student.model_dump(exclude_none=True) if req.student else None
+    return {"reply": generate_chat_reply(req.message, student_payload)}

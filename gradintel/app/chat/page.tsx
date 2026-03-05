@@ -1,126 +1,84 @@
 "use client"
 
+import { sendChatMessage } from "@/lib/api"
+import { getStoredProfile } from "@/lib/profile"
+import Link from "next/link"
 import { useState } from "react"
 
+type ChatItem = { from: "ai" | "user"; text: string }
+
 export default function ChatPage() {
-
-  const [messages, setMessages] = useState([
-    { from: "ai", text: "Hello 👋 I'm GradIntel AI. Ask me anything." }
+  const [messages, setMessages] = useState<ChatItem[]>([
+    {
+      from: "ai",
+      text: "Ask about IELTS, ROI, visa, country, or universities. I will use your saved profile.",
+    },
   ])
-
   const [input, setInput] = useState("")
+  const [busy, setBusy] = useState(false)
 
   async function sendMessage() {
+    const text = input.trim()
+    if (!text || busy) return
 
-    if (!input.trim()) return
-
-    const userText = input
     setInput("")
-
-    // Add user message
-    setMessages(prev => [...prev, { from: "user", text: userText }])
+    setBusy(true)
+    setMessages((prev) => [...prev, { from: "user", text }])
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: userText })
-      })
-
-      const data = await res.json()
-
-      // Add AI reply
-      setMessages(prev => [...prev, { from: "ai", text: data.reply }])
-
+      const result = await sendChatMessage(text, getStoredProfile())
+      setMessages((prev) => [...prev, { from: "ai", text: result.reply }])
     } catch {
-      setMessages(prev => [...prev, { from: "ai", text: "Server not responding." }])
-    }
-  }
-
-  // ⭐ SEND ON ENTER
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") {
-      sendMessage()
+      setMessages((prev) => [...prev, { from: "ai", text: "Backend is not reachable right now." }])
+    } finally {
+      setBusy(false)
     }
   }
 
   return (
-    <main style={container}>
-
-      <h1 style={{ marginBottom: 20 }}>🤖 GradIntel AI Assistant</h1>
-
-      {/* CHAT BOX */}
-      <div style={chatBox}>
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            style={{
-              textAlign: m.from === "user" ? "right" : "left",
-              marginBottom: 12
-            }}
-          >
-            <span
-              style={{
-                background: m.from === "user" ? "#2563eb" : "#e5e7eb",
-                color: m.from === "user" ? "white" : "black",
-                padding: "10px 14px",
-                borderRadius: "12px",
-                display: "inline-block"
-              }}
-            >
-              {m.text}
-            </span>
+    <main className="app-shell" style={{ padding: "24px" }}>
+      <div style={{ maxWidth: "960px", margin: "0 auto", display: "grid", gap: "14px" }}>
+        <header className="card" style={{ padding: "14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+          <h1 style={{ margin: 0, fontSize: "24px" }}>GradIntel AI Chat</h1>
+          <Link href="/dashboard" className="btn-ghost">Back to Dashboard</Link>
+        </header>
+        <section className="card" style={{ padding: "14px" }}>
+          <div style={{ minHeight: "50vh", maxHeight: "55vh", overflowY: "auto", padding: "4px" }}>
+            {messages.map((message, index) => (
+              <div key={index} style={{ textAlign: message.from === "user" ? "right" : "left", marginBottom: "10px" }}>
+                <span
+                  style={{
+                    display: "inline-block",
+                    maxWidth: "82%",
+                    padding: "10px 12px",
+                    borderRadius: "10px",
+                    background: message.from === "user" ? "#ff0000" : "#2a2a2a",
+                    color: "white",
+                  }}
+                >
+                  {message.text}
+                </span>
+              </div>
+            ))}
           </div>
-        ))}
+          <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+            <input
+              className="field-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your question..."
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  sendMessage()
+                }
+              }}
+            />
+            <button className="btn-primary" onClick={sendMessage} disabled={busy}>
+              {busy ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </section>
       </div>
-
-      {/* INPUT AREA */}
-      <div style={{ display: "flex", gap: 10 }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask GradIntel AI..."
-          style={inputStyle}
-        />
-
-        <button onClick={sendMessage} style={button}>
-          Send
-        </button>
-      </div>
-
     </main>
   )
-}
-
-const container = {
-  minHeight: "100vh",
-  background: "#eef2f7",
-  padding: "40px"
-}
-
-const chatBox = {
-  background: "white",
-  padding: "20px",
-  borderRadius: "16px",
-  height: "60vh",
-  overflowY: "auto",
-  marginBottom: "20px"
-}
-
-const inputStyle = {
-  flex: 1,
-  padding: "12px",
-  borderRadius: "10px",
-  border: "1px solid #ccc",
-  color: "black"
-}
-
-const button = {
-  padding: "12px 20px",
-  background: "#1e3a8a",
-  color: "white",
-  border: "none",
-  borderRadius: "10px",
-  cursor: "pointer"
 }

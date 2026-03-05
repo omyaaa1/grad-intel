@@ -1,155 +1,102 @@
 "use client"
 
+import { fetchPrediction } from "@/lib/api"
+import { getStoredProfile } from "@/lib/profile"
+import type { Prediction } from "@/lib/types"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
 export default function DashboardPage() {
-
-  const [data, setData] = useState<any>(null)
+  const [data, setData] = useState<Prediction | null>(null)
+  const [error, setError] = useState("")
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8000/predict")
-      .then(res => res.json())
+    const profile = getStoredProfile()
+    fetchPrediction(profile)
       .then(setData)
+      .catch(() => setError("Could not load prediction. Start backend on port 8000."))
   }, [])
 
+  if (error) {
+    return (
+      <main className="app-shell" style={{ padding: "24px" }}>
+        <p>{error}</p>
+      </main>
+    )
+  }
+
   if (!data) {
-    return <div style={{ padding: 40 }}>Loading AI insights...</div>
+    return (
+      <main className="app-shell" style={{ padding: "24px" }}>
+        <p>Loading dashboard...</p>
+      </main>
+    )
   }
 
   return (
-    <main style={{ background: "#eef2f7", minHeight: "100vh" }}>
+    <main className="app-shell" style={{ padding: "24px" }}>
+      <div style={{ maxWidth: "1200px", margin: "0 auto", display: "grid", gap: "14px" }}>
+        <header className="card" style={{ padding: "14px", display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+          <strong>GradIntel Dashboard</strong>
+          <nav style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <Link href="/plan" className="btn-ghost">Profile</Link>
+            <Link href="/universities" className="btn-ghost">Universities</Link>
+            <Link href="/map" className="btn-ghost">Map</Link>
+            <Link href="/chat" className="btn-primary">AI Chat</Link>
+          </nav>
+        </header>
 
-      {/* HEADER */}
-      <div style={header}>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <img
-            src="/gradintel-logo.png"
-            alt="GradIntel Logo"
-            style={{ height: "36px" }}
-          />
-          <span style={{ fontWeight: "bold", fontSize: "22px" }}>
-            GradIntel
-          </span>
-        </div>
-
-        <div style={{ display: "flex", gap: "28px", alignItems: "center" }}>
-          <Link href="/dashboard" style={navLink}>👤 User Info</Link>
-          <Link href="/map" style={navLink}>🌍 Map Analysis</Link>
-          <Link href="/universities" style={navLink}>🎓 Universities</Link>
-          <button style={chatButton}>🤖 GradIntel AI</button>
-        </div>
-      </div>
-
-      {/* MAIN GRID */}
-      <div style={layout}>
-
-        {/* LEFT COLUMN */}
-        <div style={leftColumn}>
-
-          {/* ⭐ STUDENT INFO FROM ML */}
-          <div style={card}>
-            <h3 style={title}>👤 Student Info</h3>
-            <p>Name: {data.student.name}</p>
-            <p>CGPA: {data.student.cgpa}</p>
-            <p>IELTS: {data.student.ielts}</p>
-            <p>Budget: ${data.student.budget}</p>
-            <p>Target: {data.student.country}</p>
-          </div>
-
-          {/* ⭐ ACTIONS FROM ML */}
-          <div style={card}>
-            <h3 style={title}>🧠 Recommended Actions</h3>
-            {data.suggestions.map((s: string, i: number) => (
-              <p key={i}>{s}</p>
+        <section style={{ display: "grid", gap: "12px", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))" }}>
+          <article className="card" style={{ padding: "14px" }}>
+            <h3 style={{ marginTop: 0 }}>Student</h3>
+            <p style={{ margin: "4px 0" }}>{data.student.name}</p>
+            <p style={{ margin: "4px 0" }}>{data.student.country} - {data.student.course}</p>
+            <p style={{ margin: "4px 0" }}>CGPA {data.student.cgpa} | IELTS {data.student.ielts}</p>
+            <p style={{ margin: "4px 0" }}>Budget ${data.student.budget.toLocaleString()}</p>
+          </article>
+          <article className="card" style={{ padding: "14px" }}>
+            <h3 style={{ marginTop: 0 }}>Insights</h3>
+            <p style={{ margin: "4px 0" }}>Admission chance: {data.insights.admissionChance}</p>
+            <p style={{ margin: "4px 0" }}>ROI: {data.insights.roi}</p>
+            <p style={{ margin: "4px 0" }}>Visa difficulty: {data.insights.visaDifficulty}</p>
+            <p style={{ margin: "4px 0" }}>Matching records: {data.totalMatches}</p>
+          </article>
+          <article className="card" style={{ padding: "14px" }}>
+            <h3 style={{ marginTop: 0 }}>Recommended Actions</h3>
+            {data.suggestions.map((item) => (
+              <p key={item} style={{ margin: "6px 0" }}>{item}</p>
             ))}
+          </article>
+        </section>
+
+        <section className="card" style={{ padding: "14px" }}>
+          <h3 style={{ marginTop: 0 }}>Top Universities</h3>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>University</th>
+                  <th>City</th>
+                  <th>Score</th>
+                  <th>Total Cost</th>
+                  <th>ROI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.universities.map((u) => (
+                  <tr key={u.university}>
+                    <td>{u.university}</td>
+                    <td>{u.city}</td>
+                    <td>{u.score}%</td>
+                    <td>${Math.round(u.totalCostUsd).toLocaleString()}</td>
+                    <td>{u.roi.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-        </div>
-
-        {/* RIGHT COLUMN */}
-        <div style={rightColumn}>
-
-          {/* ⭐ UNIVERSITIES FROM ML */}
-          <div style={card}>
-            <h3 style={title}>🎓 Recommended Universities</h3>
-            {data.universities.map((u: string, i: number) => (
-              <p key={i}>{u}</p>
-            ))}
-          </div>
-
-          {/* ⭐ INSIGHTS FROM ML */}
-          <div style={card}>
-            <h3 style={title}>📊 AI Insights</h3>
-            <p>Admission Chance: {data.insights.admissionChance}</p>
-            <p>ROI: {data.insights.roi}</p>
-            <p>Visa Difficulty: {data.insights.visaDifficulty}</p>
-          </div>
-
-        </div>
-
+        </section>
       </div>
     </main>
   )
-}
-
-
-// STYLES
-
-const header: React.CSSProperties = {
-  background: "linear-gradient(135deg, #1e3a8a, #312e81)",
-  color: "white",
-  padding: "16px 40px",
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-}
-
-const navLink: React.CSSProperties = {
-  color: "white",
-  textDecoration: "none",
-  fontWeight: 500
-}
-
-const chatButton: React.CSSProperties = {
-  background: "#2563eb",
-  color: "white",
-  border: "none",
-  padding: "10px 18px",
-  borderRadius: "10px",
-  cursor: "pointer",
-  fontWeight: "bold"
-}
-
-const layout: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 2fr",
-  gap: "24px",
-  padding: "24px"
-}
-
-const leftColumn: React.CSSProperties = {
-  display: "grid",
-  gridTemplateRows: "1fr 1fr",
-  gap: "24px"
-}
-
-const rightColumn: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: "24px"
-}
-
-const card: React.CSSProperties = {
-  background: "white",
-  padding: "24px",
-  borderRadius: "16px",
-  boxShadow: "0 6px 16px rgba(0,0,0,0.08)",
-  color: "black"
-}
-
-const title: React.CSSProperties = {
-  marginBottom: "12px",
-  fontWeight: "bold"
 }
